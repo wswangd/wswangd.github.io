@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>麻将看板</title>
+<script>
+const systemTheme=matchMedia('(prefers-color-scheme: dark)');
+let chosenTheme;
+try{chosenTheme=localStorage.getItem('mahjong-theme')}catch{}
+if(chosenTheme!=='dark'&&chosenTheme!=='light')chosenTheme=null;
+function applyTheme(){
+  const theme=chosenTheme||(systemTheme.matches?'dark':'light');
+  document.documentElement.dataset.theme=theme;
+  const button=document.getElementById('themeToggle');
+  if(button){
+    const label=theme==='dark'?'切换浅色':'切换深色';
+    button.setAttribute('aria-label',label);
+    button.title=label;
+  }
+}
+applyTheme();
+systemTheme.addEventListener('change',applyTheme);
+</script>
+<style>
+:root{--bg:#faf8f4;--fg:#1f1d1a;--mut:#7a746b;--card:#fff;--line:#e4dfd6;--up:#d9382e;--dn:#1f9d55;--ma:#c58a12;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+:root[data-theme="dark"]{--bg:#17160f;--fg:#efeae0;--mut:#9b9486;--card:#221f17;--line:#3a352a;--up:#ef5a50;--dn:#3fc27a;--ma:#e0a93a;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 -apple-system,"PingFang SC","Noto Sans SC",sans-serif;padding:14px}
+h1{font-size:20px;margin:0 0 2px}
+.page-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px}
+#themeToggle{flex:none;display:grid;place-items:center;width:36px;height:36px;border:1px solid var(--line);border-radius:8px;padding:0;background:var(--card);color:var(--fg);cursor:pointer}
+#themeToggle .sun,:root[data-theme="dark"] #themeToggle .moon{display:none}
+:root[data-theme="dark"] #themeToggle .sun{display:block}
+.sub{color:var(--mut);font-size:13px;margin-bottom:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.tabs button{flex:1;padding:8px 4px;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:8px;font-size:14px}
+.tabs button.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.stats{display:flex;justify-content:space-between;font-size:13px;color:var(--mut);margin-bottom:6px}
+.stats b{color:var(--fg)}
+.stats .total{font-size:16px;font-variant-numeric:tabular-nums}
+.stats .total.red{color:var(--up)}
+.stats .total.grn{color:var(--dn)}
+.day-summary{display:flex;flex-wrap:wrap;gap:2px 12px;margin-bottom:6px;color:var(--mut);font-size:13px;font-variant-numeric:tabular-nums}
+.day-summary span{white-space:nowrap}
+.chart{overflow:hidden}
+.chart svg{display:block}
+svg text{fill:var(--mut);font-size:10px}
+#tip{font-size:13px;color:var(--mut);min-height:40px;margin-top:6px}
+.row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0}
+.row label,.drow label{font-size:12px;color:var(--mut)}
+input{width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);font-size:15px}
+.drow{margin-top:8px}
+.btns button{width:100%;padding:10px;border-radius:8px;border:1px solid var(--up);background:var(--up);color:#fff;font-size:14px}
+.rng{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--mut);margin-bottom:8px}
+.rng input{width:auto;flex:1;padding:0;border:0;background:none}
+.rng2{margin-bottom:8px}
+#rl{font-size:12px;color:var(--mut);margin-top:2px}
+.trk{position:relative;height:26px;margin:0 -5px}
+.bar{position:absolute;left:11px;right:11px;top:11px;height:4px;border-radius:2px;background:var(--line)}
+.fill{position:absolute;top:0;height:4px;background:var(--fg);border-radius:2px}
+.trk input{position:absolute;left:0;top:0;width:100%;height:26px;margin:0;padding:0;border:0;background:none;pointer-events:none;-webkit-appearance:none;appearance:none}
+.trk input::-webkit-slider-runnable-track{background:transparent;height:26px}
+.trk input::-moz-range-track{background:transparent}
+.trk input::-webkit-slider-thumb{-webkit-appearance:none;pointer-events:auto;width:22px;height:22px;margin-top:2px;border-radius:50%;background:var(--fg);border:3px solid var(--card)}
+.trk input::-moz-range-thumb{pointer-events:auto;width:16px;height:16px;border-radius:50%;background:var(--fg);border:3px solid var(--card)}
+#yax text{stroke:var(--card);stroke-width:3px;paint-order:stroke}
+.chart{touch-action:pan-y;user-select:none;-webkit-user-select:none;cursor:crosshair}
+#pop{pointer-events:none;position:absolute;z-index:5;display:none;width:166px;max-width:calc(100% - 100px);background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:8px;box-shadow:0 3px 12px rgba(31,29,26,.08);padding:6px 9px;font-size:13px;user-select:none}
+#pop .t{display:flex;justify-content:space-between;align-items:baseline;color:var(--mut);font-size:12px;padding-bottom:4px;margin-bottom:3px;border-bottom:1px solid var(--line)}
+#pop .t i{font-style:normal;font-size:12px;color:var(--mut)}
+#pop .r{display:flex;justify-content:space-between;line-height:1.65}
+#pop .r span{color:var(--mut)}
+#pop .r b{font-weight:600;font-variant-numeric:tabular-nums}
+#pop .u{color:var(--up)}#pop .d{color:var(--dn)}
+.mv{font-size:12px;color:var(--mut);margin:6px 0 2px}
+.ma{font-size:13px;color:var(--ma);font-weight:600;margin-bottom:4px;min-height:20px}
+.red{color:var(--up)}.grn{color:var(--dn)}
+</style>
+</head>
+<body>
+<header class="page-head">
+  <h1>🀄 麻将看板</h1>
+  <button id="themeToggle" type="button" aria-label="切换深色" title="切换深色">
+    <svg class="moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M20.5 15a8.8 8.8 0 0 1-11.5-11.5A8.8 8.8 0 1 0 20.5 15Z"/></svg>
+    <svg class="sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.4 1.4m11.2 11.2L19 19M5 19l1.4-1.4M17.6 6.4 19 5"/></svg>
+  </button>
+</header>
+<div class="sub">局K：每局一根，无影线。日K：按打牌日期合并，当天最高/最低累计为影线；没来的日子不出K线。红涨绿跌，虚线是当前分，鼠标悬停显示十字线；左右拖动平移，滚轮缩放，鼠标移到K线上查看详情，点击可固定选中。</div>
+<div class="card">
+  <div class="tabs" id="modes"></div>
+  <div class="tabs" id="tabs"></div>
+  
+  <div class="stats" id="stats"></div>
+  <div class="day-summary" id="daySummary"></div>
+  <div class="ma" id="indicatorLabel"></div>
+  <div id="wrap" style="position:relative"><svg id="yax" width="100%" height="230" style="position:absolute;left:0;top:0;pointer-events:none"></svg><div class="chart" id="chart"></div><div id="pop"></div></div>
+  <div class="rng2"><div id="rl"></div><div class="trk"><div class="bar"><div class="fill" id="fill"></div></div><input type="range" id="r1" min="0" step="1"><input type="range" id="r2" min="0" step="1"></div></div>
+  <div id="macd"></div>
+</div>
+<div class="sub" id="cur"></div>
+<script src="./data.js"></script>
+<script>
+// 指标使用完整历史计算，再截取显示窗口，缩放和平移不会改变结果。
+function indicatorSettings(config, mode) {
+  const positive=(v,fallback)=>Number.isInteger(v)&&v>0?v:fallback;
+  return {ma:positive(config?.ma?.[mode],mode==='day'?5:6),
+    fast:positive(config?.macd?.fast,12),slow:positive(config?.macd?.slow,26),
+    signal:positive(config?.macd?.signal,9)};
+}
+function calculateIndicators(candles, config, mode) {
+  const p=indicatorSettings(config,mode);
+  let fast=0,slow=0,dea=0,sum=0;
+  return candles.map((x,i)=>{
+    sum+=x.c;if(i>=p.ma)sum-=candles[i-p.ma].c;
+    fast=i===0?x.c:fast+2/(p.fast+1)*(x.c-fast);
+    slow=i===0?x.c:slow+2/(p.slow+1)*(x.c-slow);
+    const dif=fast-slow;dea=i===0?dif:dea+2/(p.signal+1)*(dif-dea);
+    return {...x,maPeriod:p.ma,ma:i+1<p.ma?null:sum/p.ma,dif,dea,macd:2*(dif-dea)};
+  });
+}
+
+const D=window.DATA||{players:[],days:{}};
+const names=D.players||[];
+let rounds=[];
+(function(){
+  const days=D.days||{};
+  Object.keys(days).sort().forEach(d=>days[d].forEach((s,i)=>{
+    if(s.length!==names.length)console.warn(d+' 第'+(i+1)+'局人数不对',s);
+    else if(s.reduce((x,y)=>x+y,0)!==0)console.warn(d+' 第'+(i+1)+'局四家合计不为0',s);
+    rounds.push({d,s});
+  }));
+})();
+let sel=Math.max(0,names.indexOf(D.me)),mode='round';
+const $=id=>document.getElementById(id);
+applyTheme();
+$('themeToggle').onclick=()=>{
+  chosenTheme=document.documentElement.dataset.theme==='dark'?'light':'dark';
+  try{localStorage.setItem('mahjong-theme',chosenTheme)}catch{}
+  applyTheme();
+};
+const fmt=v=>(v>0?'+':'')+v;
+const z2=n=>String(n).padStart(2,'0');
+
+function candles(p, candleMode=mode){
+  let c=0;const out=[];
+  if(candleMode==='round'){
+    const cnt={};
+    rounds.forEach(x=>{
+      const o=c;c+=x.s[p];cnt[x.d]=(cnt[x.d]||0)+1;
+      out.push({d:x.d,j:cnt[x.d],o,h:Math.max(o,c),l:Math.min(o,c),c});
+    });
+    return out;
+  }
+  const days=[];
+  rounds.forEach(x=>{
+    let g=days[days.length-1];
+    if(!g||g.d!==x.d){g={d:x.d,a:[]};days.push(g)}
+    g.a.push(x);
+  });
+  days.forEach(g=>{
+    const o=c;let h=c,l=c;
+    let wins=0,losses=0;
+    g.a.forEach(x=>{
+      const score=x.s[p];
+      if(score>0)wins++;
+      if(score<0)losses++;
+      c+=score;h=Math.max(h,c);l=Math.min(l,c);
+    });
+    out.push({d:g.d,n:g.a.length,o,h,l,c,wins,losses});
+  });
+  return out;
+}
+
+let cs=[],G={},fullLen=0,curLo=0,curHi=0,selAbs=null,mouse=null,drag=null,moved=false,hoverK=null;
+const trendColor=value=>value>0?'red':value<0?'grn':'';
+const trendArrow=value=>value>0?'↑':value<0?'↓':'';
+const changePercent=(open,change)=>open===0?'--':fmt(+(change/Math.abs(open)*100).toFixed(2))+'%';
+const ranges={round:{lo:null,hi:null},day:{lo:null,hi:null}};
+$('r1').oninput=()=>{const r=ranges[mode];const lo=Math.max(0,Math.min(+$('r1').value,curHi-1));r.lo=lo;r.hi=curHi>=fullLen-1?null:curHi;draw()};
+$('r2').oninput=()=>{const r=ranges[mode];const hi=Math.min(fullLen-1,Math.max(+$('r2').value,curLo+1));r.lo=curLo;r.hi=hi>=fullLen-1?null:hi;draw()};
+
+function draw(){
+  $('modes').innerHTML=[['round','局K'],['day','日K']].map(m=>`<button class="${m[0]===mode?'on':''}" data-m="${m[0]}">${m[1]}</button>`).join('');
+  $('modes').querySelectorAll('button').forEach(b=>b.onclick=()=>{mode=b.dataset.m;selAbs=null;draw()});
+  $('tabs').innerHTML=names.map((n,i)=>`<button class="${i===sel?'on':''}" data-i="${i}">${n}</button>`).join('');
+  $('tabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{sel=+b.dataset.i;draw()});
+  const daily=candles(sel,'day');
+  const latestDay=daily[daily.length-1];
+  cs=calculateIndicators(mode==='day'?daily:candles(sel),D.indicators,mode);
+  const lastCand=cs[cs.length-1];
+  const last=lastCand?.c??0;
+  const latestChange=lastCand?lastCand.c-lastCand.o:0;
+  const arrow=trendArrow(latestChange);
+  const wins=cs.filter(x=>x.c>x.o).length;
+  $('stats').innerHTML=`<span>累计 <b class="total ${trendColor(last)}">${fmt(last)}</b>
+    ${arrow?`<b class="total ${trendColor(latestChange)}" aria-label="最新K线${latestChange>0?'上涨':'下跌'}">${arrow}</b>`:''}</span>
+    <span>${mode==='day'?'胜日':'胜局'} <b>${wins}/${cs.length}</b></span>`;
+  updateSummary(mode==='day'?latestDay:lastCand);
+  if(rounds.length){
+    const ld=rounds[rounds.length-1].d;
+    $('cur').textContent=`最近一次：${ld}，当天已记${rounds.filter(x=>x.d===ld).length}局`;
+  }else $('cur').textContent='还没有记录';
+  $('yax').innerHTML='';$('pop').style.display='none';
+  if(!cs.length){$('macd').innerHTML='';$('indicatorLabel').textContent='';$('chart').innerHTML='<div class="sub">还没有数据</div>';return}
+  const L=46,R=6,H=250,T=10,B=22;
+  const vw=Math.max(200,$('chart').clientWidth||320);
+  const len=cs.length,def=mode==='day'?20:40,rr=ranges[mode];
+  let hi=rr.hi===null?len-1:Math.min(rr.hi,len-1);
+  let lo=rr.lo===null?Math.max(0,hi-def+1):Math.min(rr.lo,hi);
+  if(len>1&&hi-lo<1){if(lo>0)lo=hi-1;else hi=lo+1}
+  fullLen=len;curLo=lo;curHi=hi;
+  $('r1').max=$('r2').max=Math.max(1,len-1);$('r1').value=lo;$('r2').value=hi;
+  $('r1').disabled=$('r2').disabled=len<2;
+  const dn=Math.max(1,len-1);
+  $('fill').style.left=(lo/dn*100)+'%';$('fill').style.width=((hi-lo)/dn*100)+'%';
+  $('rl').textContent=`显示第 ${lo+1}–${hi+1} 根（共${len}根） ${cs[lo].d.slice(5)} ~ ${cs[hi].d.slice(5)}`;
+  cs=cs.slice(lo,hi+1);
+  const step=(vw-L-R)/cs.length,W=vw;
+  G={W,H,L,R,T,B,step,lastC:lastCand.c,lastUp:lastCand.c>=lastCand.o};
+  $('yax').setAttribute('height',H);
+  $('chart').innerHTML=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><g id="plot"></g><g id="cross" pointer-events="none"></g></svg>`;
+  render();
+  renderMACD();
+  updateInfo();
+}
+
+function updateSummary(candle){
+  const summary=$('daySummary');
+  if(!candle){summary.textContent='';return}
+  const {d,j,n,o,h,l,c,wins,losses}=candle;
+  const change=c-o;
+  const arrow=trendArrow(change);
+  const value=(text,direction)=>`<b class="${trendColor(direction)}">${text}</b>`;
+  const record=mode==='round'?`第 ${j} 局`:
+    `当日 ${value(wins,wins)}胜 ${value(losses,-losses)}负 ${n-wins-losses}平`;
+  summary.innerHTML=`<span>${d}</span><span>${record}</span>
+    <span>开盘 ${value(o,0)}</span><span>最高 ${value(h,h-o)}</span>
+    <span>最低 ${value(l,l-o)}</span><span>收盘 ${value(c,change)}</span>
+    <span>涨跌额 ${value(fmt(change)+(arrow?' '+arrow:''),change)}</span>
+    <span>涨跌幅 ${value(changePercent(o,change),o===0?0:change)}</span>`;
+}
+
+function updateInfo(){
+  const pop=$('pop');
+  const sk=selAbs===null?-1:selAbs-curLo;
+  const k=hoverK!==null?hoverK:(sk>=0&&sk<cs.length?sk:-1);
+  if(!cs.length||k<0||k>=cs.length){pop.style.display='none';return}
+  const x=cs[k],d=x.c-x.o;
+  // 开盘分 = 上一根的收盘分（"昨收"）：高于昨收红，低于昨收绿，持平不着色
+  const cmp=v=>v>x.o?'u':v<x.o?'d':'';
+  const row=(a,v,c)=>`<div class="r"><span>${a}</span><b class="${c||''}">${v}</b></div>`;
+  const [yy,mm,dd]=x.d.split('-').map(Number);
+  const wk='日一二三四五六'[new Date(yy,mm-1,dd).getDay()];
+  const pct=changePercent(x.o,d);
+  pop.innerHTML=`<div class="t"><span>${yy}/${z2(mm)}/${z2(dd)} 星期${wk}</span><i>${mode==='day'?x.n+'局':'第'+x.j+'局'}</i></div>`
+    +row('开盘',x.o)
+    +row('最高',x.h,cmp(x.h))
+    +row('最低',x.l,cmp(x.l))
+    +row('收盘',x.c,cmp(x.c))
+    +row('涨跌额',fmt(d),cmp(x.c))
+    +row('涨跌幅',pct,x.o===0?'':cmp(x.c));
+  pop.style.display='block';
+  // 放在图表的一侧：鼠标（或选中K线）在左半边，弹窗放右边，反之放左边
+  const wb=$('wrap').getBoundingClientRect();
+  const px=(hoverK!==null&&mouse)?mouse.x-wb.left:G.L+G.step*(k+.5);
+  const right=px<G.W/2;
+  pop.style.left=right?'auto':'52px';
+  pop.style.right=right?'48px':'auto';
+  pop.style.top='8px';
+}
+
+function render(){
+  if(!cs.length||!$('plot'))return;
+  const {W,H,L,R,T,B,step}=G;
+  const sk=selAbs===null?-1:selAbs-curLo;
+  let mn=Math.min(...cs.map(x=>Math.min(x.l,x.ma??x.l))),mx=Math.max(...cs.map(x=>Math.max(x.h,x.ma??x.h)));
+  const pad=(mx-mn)*.08||10;mn-=pad;mx+=pad;G.mn=mn;G.mx=mx;
+  const y=v=>T+(mx-v)/(mx-mn)*(H-T-B);
+  const bw=Math.min(step*.6,28),every=Math.max(1,Math.ceil(40/step));
+  let s='',ax='';
+  for(let k=0;k<=4;k++){
+    const v=mn+(mx-mn)*k/4,yy=y(v);
+    if(Math.round(v)!==0)s+=`<line x1="${L}" x2="${W-R}" y1="${yy}" y2="${yy}" stroke="var(--line)"/>`;
+    ax+=`<text x="8" y="${yy-3}" text-anchor="start">${Math.round(v)}</text>`;
+  }
+  cs.forEach((x,k)=>{
+    const cx=L+step*(k+.5),col=x.c>=x.o?'var(--up)':'var(--dn)';
+    const top=y(Math.max(x.o,x.c)),hh=Math.max(1.5,Math.abs(y(x.o)-y(x.c)));
+    s+=`<g data-k="${k}"><rect x="${cx-step/2}" y="${T}" width="${step}" height="${H-T-B}" fill="transparent"/>
+    <line x1="${cx}" x2="${cx}" y1="${y(x.h)}" y2="${y(x.l)}" stroke="${col}"/>
+    <rect x="${cx-bw/2}" y="${top}" width="${bw}" height="${hh}" fill="${col}"/></g>`;
+    if(k%every===0)s+=`<text x="${cx}" y="${H-6}" text-anchor="middle" pointer-events="none">${x.d.slice(5)}</text>`;
+  });
+  const maPoints=cs.map((x,k)=>x.ma===null?'':`${L+step*(k+.5)},${y(x.ma)}`).filter(Boolean).join(' ');
+  s+=`<polyline points="${maPoints}" fill="none" stroke="var(--ma)" stroke-width="1.5" pointer-events="none"/>`;
+  let ih=0,il=0;
+  cs.forEach((x,k)=>{if(x.h>cs[ih].h)ih=k;if(x.l<cs[il].l)il=k});
+  const mark=(k,v,dy)=>{const cx=L+step*(k+.5),an=cx>W-R-10?'end':cx<30?'start':'middle';s+=`<circle cx="${cx}" cy="${y(v)}" r="2.5" fill="var(--fg)" pointer-events="none"/><text x="${cx}" y="${y(v)+dy}" text-anchor="${an}" pointer-events="none" style="fill:var(--fg);font-weight:600;stroke:var(--card);stroke-width:3px;paint-order:stroke">${v}</text>`};
+  mark(ih,cs[ih].h,-6);mark(il,cs[il].l,14);
+  if(G.lastC>=mn&&G.lastC<=mx){
+    const col=G.lastUp?'var(--up)':'var(--dn)',yy=y(G.lastC),tw=36;
+    const ty=Math.max(T,Math.min(H-B-16,G.lastUp?yy-17:yy+1));
+    s+=`<line x1="${L}" x2="${W-R}" y1="${yy}" y2="${yy}" stroke="${col}" stroke-dasharray="5 3" pointer-events="none"/><rect x="${W-R-tw}" y="${ty}" width="${tw}" height="16" rx="3" fill="${col}" pointer-events="none"/><text x="${W-R-tw/2}" y="${ty+11.5}" text-anchor="middle" pointer-events="none" style="fill:#fff;font-weight:600">${G.lastC}</text>`;
+  }
+  $('plot').innerHTML=s;
+  $('yax').innerHTML=ax;
+  drawCross();
+}
+
+function renderMACD(){
+  const {W,L,R,step}=G,H=124,T=18,B=16;
+  const cfg=indicatorSettings(D.indicators,mode),last=cs[cs.length-1];
+  $('indicatorLabel').textContent=`MA${cfg.ma} ${last.ma===null?'--':last.ma.toFixed(2)}`;
+  const bound=Math.max(1,...cs.flatMap(x=>[Math.abs(x.dif),Math.abs(x.dea),Math.abs(x.macd)]));
+  const y=v=>T+(bound-v)/(2*bound)*(H-T-B),zero=y(0);
+  let out=`<line x1="${L}" x2="${L}" y1="${T}" y2="${H-B}" stroke="var(--line)"/>`;
+  for(const fraction of [1,.5,0,-.5,-1]){
+    const value=bound*fraction, yy=y(value);
+    const label=Number(value.toPrecision(3));
+    if(fraction!==0)out+=`<line x1="${L-4}" x2="${W-R}" y1="${yy}" y2="${yy}" stroke="var(--line)"/>`;
+    out+=`<text x="${L-7}" y="${yy}" text-anchor="end" dominant-baseline="middle">${label}</text>`;
+  }
+  cs.forEach((x,k)=>{
+    const v=x.macd;
+    if(v===0)return;
+    const width=Math.min(step*.55,16);
+    out+=`<rect x="${L+step*(k+.5)-width/2}" y="${Math.min(y(v),zero)}" width="${width}" height="${Math.max(1,Math.abs(y(v)-zero))}" fill="${v>0?'var(--up)':'var(--dn)'}"/>`;
+  });
+  for(const [key,color] of [['dif','var(--ma)'],['dea','#7999c1']])out+=`<polyline points="${cs.map((x,k)=>`${L+step*(k+.5)},${y(x[key])}`).join(' ')}" stroke="${color}" fill="none" stroke-width="1.5"/>`;
+  $('macd').innerHTML=`<div class="mv">MACD (${cfg.fast}, ${cfg.slow}, ${cfg.signal}) · DIF <span style="color:var(--ma)">${last.dif.toFixed(2)}</span> · DEA <span style="color:#7999c1">${last.dea.toFixed(2)}</span> · MACD ${last.macd.toFixed(2)}</div><svg width="${W}" height="${H}" role="img" aria-label="MACD指标">${out}</svg>`;
+}
+
+// 鼠标悬停十字线：竖线吸附到K线，横线跟随鼠标并显示分数
+function drawCross(){
+  const c=$('cross');
+  if(!c)return;
+  c.innerHTML='';hoverK=null;
+  if(!mouse||(drag&&moved)||!cs.length)return;
+  const {W,H,L,R,T,B,step,mn,mx}=G;
+  const b=$('chart').getBoundingClientRect();
+  const x=mouse.x-b.left,y=mouse.y-b.top;
+  if(x<L||x>W-R||y<T||y>H-B)return;
+  const k=Math.max(0,Math.min(cs.length-1,Math.floor((x-L)/step))),cx=L+step*(k+.5);
+  hoverK=k;
+  const v=Math.round(mx-(y-T)/(H-T-B)*(mx-mn));
+  const ln='stroke="var(--mut)" stroke-dasharray="3 3"';
+  c.innerHTML=`<line x1="${cx}" x2="${cx}" y1="${T}" y2="${H-B}" ${ln}/><line x1="${L}" x2="${W-R}" y1="${y}" y2="${y}" ${ln}/>`
+    +`<rect x="${W-R-36}" y="${y-8}" width="36" height="16" rx="3" fill="var(--fg)"/><text x="${W-R-18}" y="${y+3.5}" text-anchor="middle" style="fill:var(--bg);font-weight:600">${v}</text>`
+    +`<rect x="${cx-22}" y="${H-B+1}" width="44" height="14" rx="3" fill="var(--fg)"/><text x="${cx}" y="${H-B+11}" text-anchor="middle" style="fill:var(--bg);font-weight:600">${cs[k].d.slice(5)}</text>`;
+}
+$('wrap').addEventListener('pointermove',e=>{
+  mouse=(e.pointerType==='mouse'&&!e.target.closest('#pop'))?{x:e.clientX,y:e.clientY}:null;
+  drawCross();updateInfo();
+});
+$('wrap').addEventListener('pointerleave',()=>{mouse=null;drawCross();updateInfo()});
+
+// 点击K线：弹窗显示详情（再点同一根或点 × 关闭）
+$('wrap').addEventListener('click',e=>{
+  if(moved)return;
+  if(e.target.closest('.x')){selAbs=null;render();updateInfo();return}
+  if(e.target.closest('#pop'))return;
+  const g=e.target.closest('g[data-k]');
+  if(!g){if(selAbs!==null){selAbs=null;render();updateInfo()}return}
+  const abs=curLo+ +g.dataset.k;
+  selAbs=selAbs===abs?null:abs;
+  render();updateInfo();
+});
+
+// 鼠标/手指左右拖动图表，平移显示区间
+$('wrap').addEventListener('pointerdown',e=>{
+  if(e.button>0||fullLen<2||e.target.closest('#pop'))return;
+  drag={x:e.clientX,lo:curLo,hi:curHi};moved=false;
+});
+window.addEventListener('pointermove',e=>{
+  if(!drag)return;
+  const dx=e.clientX-drag.x;
+  if(!moved&&Math.abs(dx)<5)return;
+  moved=true;
+  const span=drag.hi-drag.lo;
+  const lo=Math.max(0,Math.min(fullLen-1-span,drag.lo-Math.round(dx/G.step)));
+  if(lo===curLo)return;
+  const r=ranges[mode];r.lo=lo;r.hi=lo+span>=fullLen-1?null:lo+span;
+  draw();
+});
+const endDrag=()=>{drag=null;setTimeout(()=>{moved=false},40)};
+window.addEventListener('pointerup',endDrag);
+window.addEventListener('pointercancel',endDrag);
+
+// 滚轮缩放：向上滚放大（显示更少），向下滚缩小，以鼠标位置为中心
+$('wrap').addEventListener('wheel',e=>{
+  if(fullLen<2)return;
+  e.preventDefault();
+  const span=curHi-curLo+1,rect=$('chart').getBoundingClientRect();
+  const frac=Math.min(1,Math.max(0,(e.clientX-rect.left-G.L)/(G.W-G.L-G.R)));
+  let ns=Math.round(span*(e.deltaY<0?0.85:1/0.85));
+  if(ns===span)ns+=e.deltaY<0?-1:1;
+  ns=Math.max(2,Math.min(fullLen,ns));
+  const lo=Math.max(0,Math.min(fullLen-ns,Math.round(curLo+frac*span-frac*ns)));
+  const hi=lo+ns-1,r=ranges[mode];
+  r.lo=lo;r.hi=hi>=fullLen-1?null:hi;
+  draw();
+},{passive:false});
+
+draw();
+</script>
+</body>
+</html>
