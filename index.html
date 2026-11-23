@@ -88,10 +88,10 @@ input{width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;back
     <svg class="sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.4 1.4m11.2 11.2L19 19M5 19l1.4-1.4M17.6 6.4 19 5"/></svg>
   </button>
 </header>
-<div class="sub">局K：每局一根，无影线。日K：按打牌日期合并，当天最高/最低累计为影线；没来的日子不出K线。红涨绿跌，虚线是当前分，鼠标悬停显示十字线；左右拖动平移，滚轮缩放，鼠标移到K线上查看详情，点击可固定选中。</div>
+<div class="sub">局K：每局一根，无影线；日K：按日期合并。没来的日子不出K线。</div>
 <div class="card">
-  <div class="tabs" id="modes"></div>
   <div class="tabs" id="tabs"></div>
+  <div class="tabs" id="modes"></div>
   
   <div class="stats" id="stats"></div>
   <div class="day-summary" id="daySummary"></div>
@@ -127,7 +127,12 @@ const names=D.players||[];
 let rounds=[];
 (function(){
   const days=D.days||{};
-  Object.keys(days).sort().forEach(d=>days[d].forEach((s,i)=>{
+  // 兼容未补零的月、日，统一成 YYYY-MM-DD 后再排序。
+  const orderedDays=Object.entries(days).map(([date,scores])=>{
+    const [year,month,day]=date.split('-');
+    return [`${year}-${month.padStart(2,'0')}-${day.padStart(2,'0')}`,scores];
+  }).sort(([a],[b])=>a.localeCompare(b));
+  orderedDays.forEach(([d,scores])=>scores.forEach((s,i)=>{
     if(s.length!==names.length)console.warn(d+' 第'+(i+1)+'局人数不对',s);
     else if(s.reduce((x,y)=>x+y,0)!==0)console.warn(d+' 第'+(i+1)+'局四家合计不为0',s);
     rounds.push({d,s});
@@ -216,7 +221,7 @@ function draw(){
   $('r1').disabled=$('r2').disabled=len<2;
   const dn=Math.max(1,len-1);
   $('fill').style.left=(lo/dn*100)+'%';$('fill').style.width=((hi-lo)/dn*100)+'%';
-  $('rl').textContent=`显示第 ${lo+1}–${hi+1} 根（共${len}根） ${cs[lo].d.slice(5)} ~ ${cs[hi].d.slice(5)}`;
+  $('rl').textContent=`显示第 ${lo+1}–${hi+1} 根（共${len}根） ${cs[lo].d} ~ ${cs[hi].d}`;
   cs=cs.slice(lo,hi+1);
   const step=(vw-L-R)/cs.length,W=vw;
   G={W,H,L,R,T,B,step,lastC:lastCand.c,lastUp:lastCand.c>=lastCand.o};
@@ -235,10 +240,12 @@ function updateSummary(candle){
   const arrow=trendArrow(change);
   const value=(text,direction)=>`<b class="${trendColor(direction)}">${text}</b>`;
   const record=mode==='round'?`第 ${j} 局`:
-    `当日 ${value(wins,wins)}胜 ${value(losses,-losses)}负 ${n-wins-losses}平`;
-  summary.innerHTML=`<span>${d}</span><span>${record}</span>
-    <span>开盘 ${value(o,0)}</span><span>最高 ${value(h,h-o)}</span>
-    <span>最低 ${value(l,l-o)}</span><span>收盘 ${value(c,change)}</span>
+    `${value(wins,wins)}胜 ${value(losses,-losses)}负 ${n-wins-losses}平`;
+  const [year,month,day]=d.split('-').map(Number);
+  const weekday='日一二三四五六'[new Date(year,month-1,day).getDay()];
+  summary.innerHTML=`<span>${d} 星期${weekday}</span><span>${record}</span>
+    <span>开场 ${value(o,0)}</span><span>最高 ${value(h,h-o)}</span>
+    <span>最低 ${value(l,l-o)}</span><span>散场 ${value(c,change)}</span>
     <span>涨跌额 ${value(fmt(change)+(arrow?' '+arrow:''),change)}</span>
     <span>涨跌幅 ${value(changePercent(o,change),o===0?0:change)}</span>`;
 }
@@ -249,17 +256,17 @@ function updateInfo(){
   const k=hoverK!==null?hoverK:(sk>=0&&sk<cs.length?sk:-1);
   if(!cs.length||k<0||k>=cs.length){pop.style.display='none';return}
   const x=cs[k],d=x.c-x.o;
-  // 开盘分 = 上一根的收盘分（"昨收"）：高于昨收红，低于昨收绿，持平不着色
+  // 以开场分为基准：高于开场分用红色，低于开场分用绿色。
   const cmp=v=>v>x.o?'u':v<x.o?'d':'';
   const row=(a,v,c)=>`<div class="r"><span>${a}</span><b class="${c||''}">${v}</b></div>`;
   const [yy,mm,dd]=x.d.split('-').map(Number);
   const wk='日一二三四五六'[new Date(yy,mm-1,dd).getDay()];
   const pct=changePercent(x.o,d);
   pop.innerHTML=`<div class="t"><span>${yy}/${z2(mm)}/${z2(dd)} 星期${wk}</span><i>${mode==='day'?x.n+'局':'第'+x.j+'局'}</i></div>`
-    +row('开盘',x.o)
+    +row('开场',x.o)
     +row('最高',x.h,cmp(x.h))
     +row('最低',x.l,cmp(x.l))
-    +row('收盘',x.c,cmp(x.c))
+    +row('散场',x.c,cmp(x.c))
     +row('涨跌额',fmt(d),cmp(x.c))
     +row('涨跌幅',pct,x.o===0?'':cmp(x.c));
   pop.style.display='block';
