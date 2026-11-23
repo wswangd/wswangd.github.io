@@ -50,6 +50,7 @@ h1{font-size:20px;margin:0 0 2px}
 svg text{fill:var(--mut);font-size:10px}
 .turnover-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
 .turnover-head h2{margin:0;font-size:15px}
+.turnover-note{font-size:12px;font-weight:normal;color:var(--mut)}
 #turnoverTotal{color:var(--ma);font-variant-numeric:tabular-nums}
 #turnoverChart svg{display:block}
 #tip{font-size:13px;color:var(--mut);min-height:40px;margin-top:6px}
@@ -93,7 +94,7 @@ input{width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;back
   </button>
 </header>
 <section class="card" aria-labelledby="turnoverTitle">
-  <div class="turnover-head"><h2 id="turnoverTitle">日成交分</h2><strong id="turnoverTotal"></strong></div>
+  <div class="turnover-head"><h2 id="turnoverTitle">日成交分 <span class="turnover-note">（散场时合计当天净赢玩家的净分）</span></h2><strong id="turnoverTotal"></strong></div>
   <div id="turnoverChart"></div>
 </section>
 <div class="sub">局K：每局一根，无影线；日K：按日期合并。没来的日子不出K线。</div>
